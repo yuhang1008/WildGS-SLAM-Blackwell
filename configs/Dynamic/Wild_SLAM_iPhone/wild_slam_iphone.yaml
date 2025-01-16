@@ -1,0 +1,13 @@
+inherit_from: ./configs/wildgs_slam.yaml
+
+dataset: 'wild_slam_iphone'
+
+data:
+  root_folder: /home/jianhaozheng/Gaussian_in_the_Wild/data/wild-slam/iphone
+  output: ./output/Wild_SLAM_iPhone
+  
+cam:
+  H: 1440 
+  W: 1920 
+  H_out: 360
+  W_out: 480
