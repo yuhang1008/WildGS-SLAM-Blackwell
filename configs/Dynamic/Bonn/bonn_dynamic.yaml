@@ -3,7 +3,7 @@ inherit_from: ./configs/wildgs_slam.yaml
 dataset: 'bonn_dynamic'
 
 data:
-  root_folder: /home/jianhaozheng/Gaussian_in_the_Wild/temp/splat-slam-in-the-wild/datasets/Bonn
+  root_folder: ./datasets/Bonn
   output: ./output/Bonn
 
 cam:  #intrinsic is different per scene in TUM, this cam does not have distortion

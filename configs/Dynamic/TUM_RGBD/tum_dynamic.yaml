@@ -11,7 +11,7 @@ mapping:
     alpha: 0.8
 
 data:
-  root_folder: /home/jianhaozheng/Gaussian_in_the_Wild/temp/splat-slam-in-the-wild/datasets/TUM_RGBD
+  root_folder: ./datasets/TUM_RGBD
   output: ./output/TUM_RGBD
 
 cam:  #NOTE: intrinsic is different per scene in TUM
