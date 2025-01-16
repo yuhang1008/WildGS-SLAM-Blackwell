@@ -64,8 +64,8 @@ WildGS-SLAM accurately tracks the camera trajectory and reconstructs a 3D Gaussi
 1. First you have to make sure that you clone the repo with the `--recursive` flag.
 The simplest way to do so, is to use [anaconda](https://www.anaconda.com/). 
 ```bash
-git clone --recursive (the link (todo))
-cd (name of the repo (todo))
+git clone --recursive https://github.com/GradientSpaces/WildGS-SLAM.git
+cd WildGS-SLAM
 ```
 2. Creating a new conda environment. 
 ```bash
