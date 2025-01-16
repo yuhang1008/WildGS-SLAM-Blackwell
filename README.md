@@ -93,8 +93,11 @@ diff_gaussian_rasterization; print(torch.cuda.is_available())"
 python -m pip install -e .
 python -m pip install -r requirements.txt
 ```
-
-8. Download pretrained model.
+8. Install MMCV (used by metric depth estimator)
+```bash
+pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu117/torch1.13.0/index.html
+```
+9. Download pretrained model.
 Download the pretained models [droid.pth](https://drive.google.com/file/d/1PpqVt1H4maBa_GbPJp4NwxRsd9jk-elh/view?usp=sharing), put it inside the `pretrained` folder.
 
 ## Quick Demo

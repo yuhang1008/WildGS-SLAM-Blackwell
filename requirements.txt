@@ -29,3 +29,4 @@ xformers
 PyQt5
 glfw
 PyGLM
+mmengine
