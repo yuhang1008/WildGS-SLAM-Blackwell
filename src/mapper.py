@@ -241,9 +241,12 @@ class Mapper(object):
             self.keyframe_optimizers = torch.optim.Adam(opt_params)
 
             with Lock():
-                gaussian_split = self.map_opt_online(
-                    self.current_window, iters=self.mapping_itr_num
-                )
+                if video_idx % 4 == 0:
+                    gaussian_split = self.map_opt_online(
+                        self.current_window, iters=self.mapping_itr_num
+                    )
+                else:
+                    self._update_occ_aware_visibility(self.current_window)
                 if gaussian_split:
                     # do one more iteration after densify and prune
                     self.map_opt_online(self.current_window, iters=1)
@@ -545,6 +548,20 @@ class Mapper(object):
             self.gaussians._scaling = self.gaussians.replace_tensor_to_optimizer(
                 scales, "scaling"
             )["scaling"]
+
+    def _update_occ_aware_visibility(self, current_window):
+        self.occ_aware_visibility = {}
+        for kf_idx in current_window:
+            viewpoint = self.cameras[kf_idx]
+            render_pkg = render(
+                viewpoint,
+                self.gaussians,
+                self.pipeline_params,
+                self.background,
+            )
+            self.occ_aware_visibility[kf_idx] = (
+                render_pkg["n_touched"] > 0
+            ).long()
 
     def get_w2c_and_depth(self, video_idx, idx, mono_depth, print_info=False):
         est_frontend_depth, valid_depth_mask, c2w = self.video.get_depth_and_pose(
@@ -1146,18 +1163,7 @@ class Mapper(object):
             # Deinsifying / Pruning Gaussians
             with torch.no_grad():
                 if cur_iter == iters - 1:
-                    self.occ_aware_visibility = {}
-                    for kf_idx in current_window:
-                        viewpoint = self.cameras[kf_idx]
-                        render_pkg = render(
-                            viewpoint,
-                            self.gaussians,
-                            self.pipeline_params,
-                            self.background,
-                        )
-                        self.occ_aware_visibility[kf_idx] = (
-                            render_pkg["n_touched"] > 0
-                        ).long()
+                    self._update_occ_aware_visibility(current_window)
 
                 self.gaussians.max_radii2D[visibility_filter] = torch.max(
                     self.gaussians.max_radii2D[visibility_filter],

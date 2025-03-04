@@ -8,7 +8,7 @@ device: "cuda:0"
 mapping:
   online_plotting: False # render and save images online
   full_resolution: False # if using the full resolution for mapping, but we always keep downsampled size for tracking
-  final_refine_iters: 20000 # iterations of final refinement
+  final_refine_iters: 3000 # iterations of final refinement
   eval_before_final_ba: True
   deform_gaussians: True # apply transformation on Gaussians to account for loop closure and BA
   pcd_downsample: 32 # downsamples the unprojected depth map --> point cloud
