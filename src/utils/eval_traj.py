@@ -140,18 +140,20 @@ def kf_traj_eval(npz_path, plot_parent_dir,plot_name, stream, logger,printer):
     return ape_statistics, s, r_a, t_a
 
 
-def full_traj_eval(traj_filler, mapper, plot_parent_dir, plot_name, stream,logger,printer):
+def full_traj_eval(traj_filler, mapper, plot_parent_dir, plot_name, stream, logger, printer, fast_mode=False):
     traj_est_inv, dino_feats = traj_filler(stream)
     traj_est_lietorch = traj_est_inv.inv()
     traj_est = traj_est_lietorch.matrix().data.cpu().numpy()
 
-    # ## refine non-keyframe-traj from the mapping
-    # for i in tqdm(range(traj_est.shape[0])):
-    #     img_feat = dino_feats[i]
-    #     w2c_refined = mapper.refine_pose_non_key_frame(i,
-    #                                                 torch.tensor(np.linalg.inv(traj_est[i])),
-    #                                                 features=img_feat)
-    #     traj_est[i] = np.linalg.inv(w2c_refined.cpu().numpy())
+    if not fast_mode:
+        # refine non-keyframe-traj from the mapping
+        # this is time-consuming with minimal tracking improvement
+        for i in tqdm(range(traj_est.shape[0])):
+            img_feat = dino_feats[i]
+            w2c_refined = mapper.refine_pose_non_key_frame(i,
+                                                        torch.tensor(np.linalg.inv(traj_est[i])),
+                                                        features=img_feat)
+            traj_est[i] = np.linalg.inv(w2c_refined.cpu().numpy())
 
     kf_num = traj_filler.video.counter.value
     kf_timestamps = traj_filler.video.timestamp[:kf_num].cpu().int().numpy()

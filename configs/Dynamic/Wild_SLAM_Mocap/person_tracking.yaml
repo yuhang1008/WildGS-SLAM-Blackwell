@@ -1,8 +1,8 @@
 inherit_from: ./configs/Dynamic/Wild_SLAM_Mocap/wild_slam_mocap.yaml
-scene: person_tracking2
+scene: person_tracking
 
 data:
-  input_folder: ROOT_FOLDER_PLACEHOLDER/scene1/person_tracking2
+  input_folder: ROOT_FOLDER_PLACEHOLDER/scene1/person_tracking
   
 cam: 
   fx: 647.5684814453125

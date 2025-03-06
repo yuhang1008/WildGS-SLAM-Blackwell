@@ -61,8 +61,9 @@ class Frontend:
         for itr in range(self.iters1):
             self.graph.update(None, None, use_inactive=True)
 
-            # if itr == 1 and self.video.metric_depth_reg and self.cfg['tracking']["uncertainty_params"]['activate']:
-            #     self.video.filter_high_err_mono_depth(self.t1-1,self.graph.ii,self.graph.jj)
+            if not self.cfg['fast_mode']:
+                if itr == 1 and self.video.metric_depth_reg and self.cfg['tracking']["uncertainty_params"]['activate']:
+                    self.video.filter_high_err_mono_depth(self.t1-1,self.graph.ii,self.graph.jj)
 
         d = self.video.distance([self.t1-2], [self.t1-1], beta=self.beta, bidirectional=True)
         # Ssee self.max_consecutive_drop_of_keyframes in initi for explanation of the following process

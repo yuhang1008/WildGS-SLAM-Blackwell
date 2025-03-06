@@ -3,13 +3,14 @@ gui: False
 stride: 1            # use every X image from the dataset 
 max_frames: -1       # use the first X images from the dataset, -1 means using all
 setup_seed: 43
+fast_mode: False
 device: "cuda:0"
 
 mapping:
   online_plotting: False # render and save images online
   full_resolution: False # if using the full resolution for mapping, but we always keep downsampled size for tracking
-  final_refine_iters: 3000 # iterations of final refinement
-  eval_before_final_ba: True
+  final_refine_iters: 20000 # iterations of final refinement, it will be forced to be 3000 if fast_mode is on
+  eval_before_final_ba: False
   deform_gaussians: True # apply transformation on Gaussians to account for loop closure and BA
   pcd_downsample: 32 # downsamples the unprojected depth map --> point cloud
   pcd_downsample_init: 16 # first frame downsampling factor is smaller
@@ -140,7 +141,7 @@ cam:
 mono_prior:
   # Metric depth model, only support: 
   #     metric3d_vit_small, metric3d_vit_large and metric3d_vit_giant2
-  #     dpt2_{vits,vitb,vitl}_{hypersim,vkitti}_{20,80}  (see src/mono_estimator.py for detail)
+  #     dpt2_{vits,vitb,vitl}_{hypersim,vkitti}_{20,80}  (see src/utils/mono_priors/metric_depth_estimators.py for detail)
   #             e.g. dpt2_vitl_hypersim_20, dpt2_vitl_vkitti_80
   depth: 'metric3d_vit_large'
 

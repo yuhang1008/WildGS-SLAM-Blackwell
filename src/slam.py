@@ -209,6 +209,7 @@ class SLAM:
             self.stream,
             self.logger,
             self.printer,
+            self.cfg['fast_mode'],
         )
 
         self.mapper.gaussians.save_ply(f"{self.save_dir}/final_gs.ply")

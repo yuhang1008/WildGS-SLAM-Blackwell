@@ -241,12 +241,20 @@ class Mapper(object):
             self.keyframe_optimizers = torch.optim.Adam(opt_params)
 
             with Lock():
-                if video_idx % 4 == 0:
+                if self.config['fast_mode']:
+                    # We are in fast mode,
+                    # update map and uncertainty MLP every 4 key frames
+                    if video_idx % 4 == 0:
+                        gaussian_split = self.map_opt_online(
+                            self.current_window, iters=self.mapping_itr_num
+                        )
+                    else:
+                        self._update_occ_aware_visibility(self.current_window)
+                else:
                     gaussian_split = self.map_opt_online(
                         self.current_window, iters=self.mapping_itr_num
                     )
-                else:
-                    self._update_occ_aware_visibility(self.current_window)
+
                 if gaussian_split:
                     # do one more iteration after densify and prune
                     self.map_opt_online(self.current_window, iters=1)

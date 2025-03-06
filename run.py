@@ -26,6 +26,9 @@ if __name__ == '__main__':
 
     cfg = config.load_config(args.config)
     setup_seed(cfg['setup_seed'])
+    if cfg['fast_mode']:
+        # Force the final refine iterations to be 3000 if in fast mode
+        cfg['mapping']['final_refine_iters'] = 3000
 
     output_dir = cfg['data']['output']
     output_dir = output_dir+f"/{cfg['scene']}"
