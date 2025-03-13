@@ -254,7 +254,7 @@ def compute_mapping_loss_components(
 
     # Compute depth loss with adaptive thresholding
     median_depth = ref_depth.median()
-    depth_threshold = min(10 * median_depth, 10)
+    depth_threshold = min(10 * median_depth, 50)
     depth_mask = ((ref_depth > 0.01) & (ref_depth < depth_threshold)).view(
         *rendered_depth.shape
     )

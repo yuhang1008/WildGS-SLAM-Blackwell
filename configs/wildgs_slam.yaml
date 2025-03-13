@@ -111,7 +111,7 @@ tracking:
     loop_window: 25    # N_local in GO-SLAM paper
     loop_thresh: 25.0  # only consider edge with avg flow < X pixels
     loop_radius: 1     # build edges within local window [i-radius, i]
-    loop_nms: 12       # r_loop in GO-SLAM paper
+    loop_nms: 10       # r_loop in GO-SLAM paper
     # Don't set {metric_depth_reg} to False unless you want to do some ablation study
     # If it's False, the depth for mapping will be processed following how Splat-SLAM correct scale.
     #                See "get_w2c_and_depth" in mapper.py for detail.
@@ -119,7 +119,7 @@ tracking:
     normalize: False    # whether to normalize disps after each BA iter
   uncertainty_params:
     activate: True
-  force_keyframe_every_n_frames: 8 # set to negative value if you don't want to force to insert keyframes
+  force_keyframe_every_n_frames: 9 # set to negative value if you don't want to force to insert keyframes
   nb_ref_frame_metric_depth_filtering: 6 # number of reference frames for filtering high uncertainty metric depth points
 
 cam:
