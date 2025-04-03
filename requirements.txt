@@ -10,7 +10,6 @@ PyOpenGL-accelerate
 pyrender
 ninja
 setuptools
-torch-scatter
 timm
 plyfile==0.8.1
 tqdm
@@ -23,10 +22,7 @@ imgviz
 lpips
 rich
 kornia
-tensorboard
-timm==0.9.10
-xformers
-PyQt5
+PyQt5==5.15.3
 glfw
 PyGLM
 mmengine
