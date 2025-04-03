@@ -10,7 +10,7 @@ PyOpenGL-accelerate
 pyrender
 ninja
 setuptools
-timm
+timm==0.9.10
 plyfile==0.8.1
 tqdm
 opencv-python==4.8.1.78
