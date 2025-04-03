@@ -14,7 +14,8 @@
     ·
     <a href="https://ir0.github.io/"><strong>Iro Armeni</strong></a>
 </p>
-  <h3 align="center">(Link to be added)<a href="no_link">Paper</a> | <a href="no_link">Video</a> | <a href="no_link">Project Page</a></h3>
+<p align="center"> <strong>Computer Vision And Pattern Recognition (CVPR) 2025</strong></p>
+  <h3 align="center"><a href="no_link">Paper</a> | <a href="https://www.youtube.com/watch?v=xXuolzFvddQ">Video</a> | <a href="https://wildgs-slam.github.io/">Project Page</a></h3>
   <div align="center"></div>
 </p>
 <p align="center">
@@ -72,10 +73,13 @@ cd WildGS-SLAM
 conda create --name wildgs-slam python=3.10
 conda activate wildgs-slam
 ```
-3. Install CUDA 11.7 using conda and pytorch 1.12
+3. Install CUDA 11.8 and torch-related pacakges
 ```bash
-conda install conda-forge::cudatoolkit-dev=11.7.0
-conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
+pip install numpy==1.26.3 # do not use numpy >= v2.0.0
+conda install --channel "nvidia/label/cuda-11.8.0" cuda-toolkit
+pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu118
+pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-2.1.0+cu118.html
+pip3 install -U xformers==0.0.22.post7+cu118 --index-url https://download.pytorch.org/whl/cu118
 ```
 5. Install the remaining dependencies.
 ```bash
@@ -95,50 +99,69 @@ python -m pip install -r requirements.txt
 ```
 8. Install MMCV (used by metric depth estimator)
 ```bash
-pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu117/torch1.13.0/index.html
+pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu118/torch2.1.0/index.html
 ```
 9. Download pretrained model.
 Download the pretained models [droid.pth](https://drive.google.com/file/d/1PpqVt1H4maBa_GbPJp4NwxRsd9jk-elh/view?usp=sharing), put it inside the `pretrained` folder.
 
 ## Quick Demo
-First download the crowd sequence of Wild-SLAM dataset from (todo: add the link when the data is available)
+First download and zip the crowd sequence of Wild-SLAM dataset
+```bash
+bash scripts_downloading/download_demo_data.sh
+```
+Then, run WildGS-SLAM by the following command:
 ```
 python run.py  ./configs/Dynamic/Wild_SLAM_Mocap/crowd_demo.yaml
 ```
 
 ## Run
 
-### Bonn Dynamic Dataset
-Download the data as below and the data is saved into the `./Datasets/Bonn` folder. Note that the script only downloads the 8 sequences reported in the paper. To get other sequences, you can download from the [webiste of Bonn Dynamic Dataset](https://www.ipb.uni-bonn.de/data/rgbd-dynamic-dataset/index.html).
+### Wild-SLAM Mocap Dataset ([🤗 Hugging Face](https://huggingface.co/datasets/gradient-spaces/Wild-SLAM/tree/main))
+Download the dataset by the following command. Although WildGS-SLAM is a monocular SLAM system, we also provide depth frames for other RGB-D SLAM methods. The following command only downloads the 10 dynamic sequences. However, we also provide some static sequences. Please check the huggingface page to download them if you are interested in testing with these sequences.
 ```bash
-bash scripts/download_bonn.sh
+bash scripts_downloading/download_bonn.sh
 ```
 You can run WildGS-SLAM via the following command:
 ```bash
-python run.py  ./configs/Dynamic/Bonn/{config_file}
+python run.py  ./configs/Dynamic/Wild_SLAM_Mocap/{config_file} #run a single sequence
+bash scripts_run/run_wild_slam_mocap_all.sh #run all dynamic sequences
+```
+
+### Bonn Dynamic Dataset
+Download the data as below and the data is saved into the `./Datasets/Bonn` folder. Note that the script only downloads the 8 sequences reported in the paper. To get other sequences, you can download from the [webiste of Bonn Dynamic Dataset](https://www.ipb.uni-bonn.de/data/rgbd-dynamic-dataset/index.html).
+```bash
+bash scripts_downloading/download_bonn.sh
+```
+You can run WildGS-SLAM via the following command:
+```bash
+python run.py  ./configs/Dynamic/Bonn/{config_file} #run a single sequence
+bash scripts_run/run_bonn_all.sh #run all dynamic sequences
 ```
 We have prepared config files for the 8 sequences. Note that this dataset needs preprocess to transform the pose. We have implemented that in the dataloader. If you want to test with sequences other than the ones provided, don't forget to specify ```dataset: 'bonn_dynamic'``` in your config file. The easiest way is to inherit from ```bonn_dynamic.yaml```.
 
 ### TUM RGB-D (dynamic) Dataset
 Download the data (9 dynamic sequences) as below and the data is saved into the `./Datasets/TUM_RGBD` folder. 
 ```bash
-bash scripts/download_tum.sh
+bash scripts_downloading/download_tum.sh
 ```
 The config files for 9 dynamic sequences of this dataset can be found under ```./configs/Dynamic/TUM_RGBD```. You can run WildGS-SLAM as the following:
 ```bash
-python run.py  ./configs/Dynamic/TUM_RGBD/{config_file}
+python run.py  ./configs/Dynamic/TUM_RGBD/{config_file} #run a single sequence
+bash scripts_run/run_tum_dynamic_all.sh #run all dynamic sequences
 ```
-
-### Wild-SLAM dataset
-To-do (add more here when it can be released)
 
 ## Evaluation
 
 ### Camera poses
 The camera trajectories will be automatically evaluated after each run of WildGS-SLAM (if GT pose is provided). Statistics of the results are summarized in ```{save_dir}/traj/metrics_full_traj.txt```. The estimated camera poses are saved in ```{save_dir}/traj/est_poses_full.txt``` following the [TUM format](https://cvg.cit.tum.de/data/datasets/rgbd-dataset/file_formats).
 
+We provide a python script to summarize the RMSE of ATE [cm]:
+```bash
+python scripts_run/summarize_pose_eval.py
+```
+
 ### Novel View Synthesis
-Only support for Wild-SLAM Mocap dataset. Write more when the dataset is ready to be public.
+Only support for Wild-SLAM Mocap dataset. (Todo: this needs some time to be released)
 
 ## Acknowledgement
 We adapted some codes from some awesome repositories including [MonoGS](https://github.com/muskie82/MonoGS), [DROID-SLAM](https://github.com/princeton-vl/DROID-SLAM), [Splat-SLAM](https://github.com/google-research/Splat-SLAM), [GIORIE-SLAM](https://github.com/zhangganlin/GlORIE-SLAM), [nerf-on-the-go](https://github.com/cvg/nerf-on-the-go) and [Metric3D V2](https://github.com/YvanYin/Metric3D). Thanks for making codes public available. 
