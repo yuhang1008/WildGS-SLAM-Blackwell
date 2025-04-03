@@ -3,7 +3,7 @@ inherit_from: ./configs/wildgs_slam.yaml
 dataset: 'wild_slam_mocap'
 
 data:
-  root_folder: /home/jianhaozheng/Gaussian_in_the_Wild/data/wild-slam/mocap
+  root_folder: ./datasets/Wild_SLAM_Mocap
   output: ./output/Wild_SLAM_Mocap
   
 cam:  #intrinsic is slightly different per seq
