@@ -101,8 +101,7 @@ python -m pip install -r requirements.txt
 ```bash
 pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu118/torch2.1.0/index.html
 ```
-9. Download pretrained model.
-Download the pretained models [droid.pth](https://drive.google.com/file/d/1PpqVt1H4maBa_GbPJp4NwxRsd9jk-elh/view?usp=sharing), put it inside the `pretrained` folder.
+9. Download the pretained models [droid.pth](https://drive.google.com/file/d/1PpqVt1H4maBa_GbPJp4NwxRsd9jk-elh/view?usp=sharing), put it inside the `pretrained` folder.
 
 ## Quick Demo
 First download and zip the crowd sequence of Wild-SLAM dataset
@@ -119,7 +118,8 @@ python run.py  ./configs/Dynamic/Wild_SLAM_Mocap/crowd_demo.yaml
 ### Wild-SLAM Mocap Dataset ([🤗 Hugging Face](https://huggingface.co/datasets/gradient-spaces/Wild-SLAM/tree/main))
 Download the dataset by the following command. Although WildGS-SLAM is a monocular SLAM system, we also provide depth frames for other RGB-D SLAM methods. The following command only downloads the 10 dynamic sequences. However, we also provide some static sequences. Please check the huggingface page to download them if you are interested in testing with these sequences.
 ```bash
-bash scripts_downloading/download_bonn.sh
+bash scripts_downloading/download_wild_slam_mocap_scene1.sh
+bash scripts_downloading/download_wild_slam_mocap_scene2.sh
 ```
 You can run WildGS-SLAM via the following command:
 ```bash
