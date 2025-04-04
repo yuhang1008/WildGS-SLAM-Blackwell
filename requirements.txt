@@ -22,7 +22,7 @@ imgviz
 lpips
 rich
 kornia
-PyQt5==5.15.3
+PyQt5
 glfw
 PyGLM
 mmengine
