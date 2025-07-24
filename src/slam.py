@@ -104,6 +104,7 @@ class SLAM:
 
         while self.all_trigered < self.num_running_thread:
             pass
+        self.printer.print("Tracking Starts!", FontColor.TRACKER)
         self.printer.pbar_ready()
         self.tracker.run(self.stream)
         self.printer.print("Tracking Done!", FontColor.TRACKER)
@@ -120,6 +121,7 @@ class SLAM:
 
         while self.all_trigered < self.num_running_thread:
             pass
+        self.printer.print("Mapping Starts!", FontColor.MAPPER)
         self.mapper.run()
         self.printer.print("Mapping Done!", FontColor.MAPPER)
 
@@ -277,12 +279,13 @@ class SLAM:
             mp.Process(target=self.tracking, args=(t_pipe,)),
             mp.Process(target=self.mapping, args=(m_pipe,q_main2vis,q_vis2main)),
         ]
-        self.num_running_thread[0] += len(processes)
+        self.num_running_thread += len(processes)
+        if self.cfg['gui']:
+            self.num_running_thread += 1
         for p in processes:
             p.start()
 
         if self.cfg['gui']:
-            time.sleep(5)
             pipeline_params = munchify(self.cfg["mapping"]["pipeline_params"])
             bg_color = [0, 0, 0]
             background = torch.tensor(
@@ -299,7 +302,7 @@ class SLAM:
             )
             gui_process = mp.Process(target=slam_gui.run, args=(params_gui,))
             gui_process.start()
-            self.num_running_thread[0] += 1
+            self.all_trigered += 1
 
 
         for p in processes:
