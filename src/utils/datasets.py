@@ -412,6 +412,49 @@ class TUM_RGBD(BaseDataset):
         pose[:3, 3] = pvec[:3]
         return pose
 
+class SevenScenes(BaseDataset):
+    def __init__(self, cfg, device='cuda:0'
+                 ):
+        super(SevenScenes, self).__init__(cfg, device)
+        self.color_paths = sorted(
+            glob.glob(f'{self.input_folder}/seq-01/*.color.png'))
+        self.depth_paths = sorted(
+            glob.glob(f'{self.input_folder}/seq-01/*.depth.png'))
+        
+        scene_name = os.path.basename(self.input_folder)
+        pose_data = np.loadtxt(os.path.join(self.input_folder, f'../{scene_name}.txt'),dtype=np.unicode_)
+        pose_vecs = pose_data[:, 1:].astype(np.float64)
+        self.poses = []
+        assert len(self.color_paths) == len(pose_vecs), "Number of images and poses do not match"
+        inv_pose = None
+        for i in range(len(self.color_paths)):
+            c2w = self.pose_matrix_from_quaternion(pose_vecs[i])
+            if inv_pose is None:
+                inv_pose = np.linalg.inv(c2w)
+                c2w = np.eye(4)
+            else:
+                c2w = inv_pose@c2w
+            self.poses += [c2w]
+
+
+        stride = cfg['stride']
+        max_frames = cfg['max_frames']
+        if max_frames < 0:
+            max_frames = len(self.color_paths)
+
+        self.color_paths = self.color_paths[:max_frames][::stride]
+        self.depth_paths = self.depth_paths[:max_frames][::stride]
+        self.poses = self.poses[:max_frames][::stride]
+        self.n_img = len(self.color_paths)
+
+    def pose_matrix_from_quaternion(self, pvec):
+        """ convert 4x4 pose matrix to (t, q) """
+        from scipy.spatial.transform import Rotation
+
+        pose = np.eye(4)
+        pose[:3, :3] = Rotation.from_quat(pvec[3:]).as_matrix()
+        pose[:3, 3] = pvec[:3]
+        return pose
 class RGB_NoPose(BaseDataset):
     def __init__(self, cfg, device='cuda:0'
                  ):
@@ -435,5 +478,6 @@ dataset_dict = {
     "tumrgbd": TUM_RGBD,
     "bonn_dynamic": TUM_RGBD,
     "wild_slam_mocap": TUM_RGBD,
+    "7scenes": SevenScenes,
     "wild_slam_iphone": RGB_NoPose
 }
