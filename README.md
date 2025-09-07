@@ -1,3 +1,90 @@
+# Build WildGS-SLAM on Blackwell Architecture GPUs (RTX 50 series, etc.)
+
+1. make sure have nvidia driver and CUDA installed
+2. clone the repo **with recursive**
+
+```bash
+git clone --recursive https://github.com/yuhang1008/WildGS-SLAM-Blackwell.git
+cd WildGS-SLAM
+```
+
+3. create conda env 
+
+```bash
+conda create --name wildgs-slam python=3.10
+conda activate wildgs-slam
+```
+
+4. install numpy and CUDA tookit
+
+```bash
+# Install numpy (keep the version constraint)
+pip install numpy==1.26.3
+
+# Install CUDA toolkit
+conda install cuda-toolkit -c nvidia
+```
+
+5. Install Pytorch and Torch-scatter
+
+**IMPORTANT: Blackwell gpu should be on CUDA12.8 or CUDA12.9**
+
+- For CUDA 12.8:
+
+```bash
+# Install PyTorch with CUDA 12.8
+pip3 install torch torchvision
+
+# Install torch-scatter for CUDA 12.8
+pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-2.8.0+cu128.html
+```
+
+- For CUDA 12.9:
+
+```bash
+# Install PyTorch with CUDA 12.9 support (official recommendation)
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu129
+
+# Install torch-scatter for CUDA 12.9
+pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-2.8.0+cu129.html
+```
+
+6. Install xformers 
+
+```bash
+# Install xformers
+# Install from source with Blackwell CUDA support
+pip install --no-build-isolation --pre -v -U git+https://github.com/facebookresearch/xformers.git@fde5a2fb46e3f83d73e2974a4d12caf526a4203e
+```
+
+7. install Third-party dependencies 
+
+```bash
+python -m pip install -e thirdparty/lietorch/
+python -m pip install -e thirdparty/diff-gaussian-rasterization-w-pose/
+python -m pip install -e thirdparty/simple-knn/
+
+# then check installation
+python -c "import torch; import lietorch; import simple_knn; import diff_gaussian_rasterization; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda}')"
+```
+
+8. install package 
+
+```bash
+python -m pip install -e .
+python -m pip install -r requirements.txt
+```
+
+9. install MMCV pip install mmcv-full 
+
+```bash
+pip install mmcv-full
+```
+
+Now, you can follow the step 9 onwards in official instruction to test and use WildGS-SLAM.
+
+
+
 <p align="center">
 
   <h1 align="center">WildGS-SLAM: Monocular Gaussian Splatting SLAM in Dynamic Environments</h1>
