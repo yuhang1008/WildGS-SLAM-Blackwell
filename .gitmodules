@@ -3,13 +3,13 @@
 	url = https://github.com/eriksandstroem/evaluate_3d_reconstruction_lib.git
 [submodule "thirdparty/lietorch"]
 	path = thirdparty/lietorch
-	url = https://github.com/princeton-vl/lietorch.git
+	url = https://github.com/yuhang1008/lietorch_blackwell.git
 [submodule "thirdparty/diff-gaussian-rasterization-w-pose"]
 	path = thirdparty/diff-gaussian-rasterization-w-pose
-	url = https://github.com/rmurai0610/diff-gaussian-rasterization-w-pose.git
+	url = https://github.com/yuhang1008/diff-gaussian-rasterization-w-pose_blackwell.git
 [submodule "thirdparty/simple-knn"]
 	path = thirdparty/simple-knn
-	url = https://github.com/camenduru/simple-knn.git
+	url = https://github.com/yuhang1008/simple-knn_blackwell.git
 [submodule "thirdparty/eigen"]
 	path = thirdparty/eigen
 	url = https://gitlab.com/libeigen/eigen.git
