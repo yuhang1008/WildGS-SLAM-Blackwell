@@ -19,12 +19,16 @@ class DepthVideo:
     def __init__(self, cfg, printer, uncer_network=None):
         self.cfg =cfg
         self.output = f"{cfg['data']['output']}/{cfg['scene']}"
+
+        # 360
         ht = cfg['cam']['H_out']
         self.ht = ht
+        # 640
         wd = cfg['cam']['W_out']
         self.wd = wd
+
         self.counter = Value('i', 0) # current keyframe count
-        buffer = cfg['tracking']['buffer']
+        buffer = cfg['tracking']['buffer'] #350
         self.metric_depth_reg = cfg['tracking']['backend']['metric_depth_reg']
         if not self.metric_depth_reg:
             self.printer.print(f"Metric depth for regularization is not activated.",FontColor.INFO)
@@ -45,6 +49,7 @@ class DepthVideo:
         self.npc_dirty = torch.zeros(buffer, device=self.device, dtype=torch.bool).share_memory_()
 
         self.poses = torch.zeros(buffer, 7, device=self.device, dtype=torch.float).share_memory_()
+        #[buffer, ht//self.down_scale, wd//self.down_scale], feature point depth!
         self.disps = torch.ones(buffer, ht//self.down_scale, wd//self.down_scale, device=self.device, dtype=torch.float).share_memory_()
         self.zeros = torch.zeros(buffer, ht//self.down_scale, wd//self.down_scale, device=self.device, dtype=torch.float).share_memory_()
         self.disps_up = torch.zeros(buffer, ht, wd, device=self.device, dtype=torch.float).share_memory_()
@@ -57,8 +62,11 @@ class DepthVideo:
         self.valid_depth_mask = torch.zeros(buffer, ht, wd, device=self.device, dtype=torch.bool).share_memory_()
         self.valid_depth_mask_small = torch.zeros(buffer, ht//self.down_scale, wd//self.down_scale, device=self.device, dtype=torch.bool).share_memory_()        
         ### feature attributes ###
+        # fnet_feature [buffer, 1, 128, (45)h/8, (80)w/8]
         self.fmaps = torch.zeros(buffer, 1, 128, ht//self.down_scale, wd//self.down_scale, dtype=torch.half, device=self.device).share_memory_()
+        # first128_cnet_feature [buffer, 128, (45)h/8, (80)w/8]
         self.nets = torch.zeros(buffer, 128, ht//self.down_scale, wd//self.down_scale, dtype=torch.half, device=self.device).share_memory_()
+        # second128_cnet_feature [buffer, 128, (45)h/8, (80)w/8]
         self.inps = torch.zeros(buffer, 128, ht//self.down_scale, wd//self.down_scale, dtype=torch.half, device=self.device).share_memory_()
 
         # initialize poses to identity transformation
@@ -68,14 +76,16 @@ class DepthVideo:
         self.uncertainty_aware = cfg['tracking']["uncertainty_params"]['activate']
         self.uncer_network = uncer_network
         if self.uncertainty_aware:
-            n_features = self.cfg["mapping"]["uncertainty_params"]['feature_dim']
+            n_features = self.cfg["mapping"]["uncertainty_params"]['feature_dim'] # 384
             
             # This check is to ensure the size of self.dino_feats
             if self.cfg["mono_prior"]["feature_extractor"] not in ["dinov2_reg_small_fine", "dinov2_small_fine","dinov2_vits14", "dinov2_vits14_reg"]:
                 raise ValueError("You are using a new feature extractor, make sure the downsample factor is 14")
             
             # The followings are in cpu to save memory
+            # dino_feats [25(h/14), 45(w/14), 384]
             self.dino_feats = torch.zeros(buffer, ht//14, wd//14, n_features, device='cpu', dtype=torch.float).share_memory_()
+            # resized dino features [384, 45, 80]
             self.dino_feats_resize = torch.zeros(buffer, n_features, ht//self.down_scale, wd//self.down_scale, device='cpu', dtype=torch.float).share_memory_()
             self.uncertainties_inv = torch.ones(buffer, ht//self.down_scale, wd//self.down_scale, device=self.device, dtype=torch.float).share_memory_()
         else:
@@ -93,40 +103,44 @@ class DepthVideo:
             self.counter.value = index.max().item() + 1
 
         self.timestamp[index] = item[0]
-        self.images[index] = item[1].cpu()
+        self.images[index] = item[1].cpu() # [3, 360, 640]
 
         if item[2] is not None:
-            self.poses[index] = item[2]
+            self.poses[index] = item[2] # pose [7]
 
         if item[3] is not None:
             self.disps[index] = item[3]
 
 
         if item[4] is not None:
-            mono_depth = item[4][self.slice_h,self.slice_w]
+            mono_depth = item[4][self.slice_h,self.slice_w] # [360, 640]
             self.mono_disps[index] = torch.where(mono_depth>0, 1.0/mono_depth, 0)
             self.mono_disps_up[index] = torch.where(item[4]>0, 1.0/item[4], 0)
-            # self.disps[index] = torch.where(mono_depth>0, 1.0/mono_depth, 0)
 
         if item[5] is not None:
-            self.intrinsics[index] = item[5]
+            self.intrinsics[index] = item[5] # [4], downscaled intrinsics
 
         if len(item) > 6 and item[6] is not None:
-            self.fmaps[index] = item[6]
+            self.fmaps[index] = item[6] # fnet_feature [128, (45)h/8, (80)w/8]
 
         if len(item) > 7 and item[7] is not None:
-            self.nets[index] = item[7]
+            self.nets[index] = item[7] # first128_cnet_feature [128, (45)h/8, (80)w/8]
 
         if len(item) > 8 and item[8] is not None:
-            self.inps[index] = item[8]
+            self.inps[index] = item[8] # second128_cnet_feature [128, (45)h/8, (80)w/8]
 
         if len(item) > 9 and item[9] is not None:
-            self.dino_feats[index] = item[9].cpu()
+            self.dino_feats[index] = item[9].cpu() # dino_features [(25)h/14, 45(w/14), 384]
 
             if len(item[9].shape) == 3:
-                self.dino_feats_resize[index] = F.interpolate(item[9].permute(2,0,1).unsqueeze(0),
-                                                            self.disps_up.shape[-2:], 
-                                                            mode='bilinear').squeeze()[:,self.slice_h,self.slice_w].cpu()
+                #dino_feats_resize: [384, 45)h/8, (80)w/8]
+                self.dino_feats_resize[index] = F.interpolate(item[9].permute(2,0,1) # Rearranges dimensions: [h/8, w/8, C] → [C, h/8, w/8],  
+                                                                     .unsqueeze(0), # Adds batch dimension: [C, h/8, w/8] → [1, C, h/8, w/8]
+                                                            self.disps_up.shape[-2:], # interpulate to [h, w]. shape: [360, 640]
+                                                            # squeeze to [C, h, w], remove the batch dimension
+                                                            # self.slice_h = slice(3, 361, 8), self.slice_w = slice(3, 641, 8):
+                                                            # Takes every 8th pixel starting from pixel 3, up to (but not including) pixel 361 or 641
+                                                            mode='bilinear').squeeze()[:,self.slice_h,self.slice_w].cpu() #return size: [384, 45, 80]
             else:
                 self.dino_feats_resize[index] = F.interpolate(item[9].permute(0,3,1,2),
                                                             self.disps_up.shape[-2:], 
@@ -193,10 +207,13 @@ class DepthVideo:
 
 
     def reproject(self, ii, jj):
-        """ project points from ii -> jj """
-        ii, jj = DepthVideo.format_indicies(ii, jj)
-        Gs = lietorch.SE3(self.poses[None])
-
+        """ project points in ii to jj frame, return the projected pixel locations and the validity mask.
+            The validity mask is set false if point too close to camera
+        """
+        ii, jj = DepthVideo.format_indicies(ii, jj) # looks no changve
+        Gs = lietorch.SE3(self.poses[None]) # Tw_c
+        
+        # disps: [buffer, ht//self.down_scale, wd//self.down_scale], feature point depth!
         coords, valid_mask = \
             pops.projective_transform(Gs, self.disps[None], self.intrinsics[None], ii, jj)
 

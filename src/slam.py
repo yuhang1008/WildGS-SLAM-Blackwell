@@ -270,29 +270,59 @@ class SLAM:
         self.printer.print(f"File saved as {file_path}", FontColor.EVAL)
 
     def run(self):
+        """
+        Main execution function that orchestrates the SLAM system using multiprocessing.
+        
+        This function sets up and manages multiple processes for:
+        1. Tracking: Estimates camera poses and tracks features
+        2. Mapping: Builds and maintains the 3D map using Gaussian splatting
+        3. GUI (optional): Provides real-time visualization
+        
+        The processes communicate through pipes and queues for data exchange.
+        """
+        
+        # Create bidirectional communication pipe between mapping and tracking processes
+        # m_pipe: mapping process end, t_pipe: tracking process end
         m_pipe, t_pipe = mp.Pipe()
 
+        # Set up communication queues for GUI visualization (if enabled)
+        # These queues allow the main process to send data to GUI and receive user input
         q_main2vis = mp.Queue() if self.cfg['gui'] else None
         q_vis2main = mp.Queue() if self.cfg['gui'] else None
 
+        # Define the core SLAM processes
         processes = [
-            mp.Process(target=self.tracking, args=(t_pipe,)),
-            mp.Process(target=self.mapping, args=(m_pipe,q_main2vis,q_vis2main)),
+            mp.Process(target=self.tracking, args=(t_pipe,)),  # Camera tracking process
+            mp.Process(target=self.mapping, args=(m_pipe,q_main2vis,q_vis2main)),  # 3D mapping process
         ]
+        
+        # Update thread counter for process monitoring
         self.num_running_thread += len(processes)
         if self.cfg['gui']:
-            self.num_running_thread += 1
+            self.num_running_thread += 1  # Account for GUI process
+            
+        # Start all core SLAM processes
         for p in processes:
             p.start()
 
+        # Initialize GUI process if visualization is enabled
         if self.cfg['gui']:
+            # Convert pipeline parameters to munch object for easier access
             pipeline_params = munchify(self.cfg["mapping"]["pipeline_params"])
+            
+            # Set up black background for rendering
             bg_color = [0, 0, 0]
             background = torch.tensor(
                 bg_color, dtype=torch.float32, device=self.device
             )
+            
+            # Initialize Gaussian splatting model for GUI visualization only
+            # NOTE: This is NOT the main Gaussian model used for SLAM mapping.
+            # The actual mapping Gaussian model is created and managed in the mapping process.
+            # This GUI model only receives copies of the data for visualization purposes.
             gaussians = GaussianModel(self.cfg['mapping']['model_params']['sh_degree'], config=self.cfg)
 
+            # Create GUI parameters object with all necessary components
             params_gui = gui_utils.ParamsGUI(
                 pipe=pipeline_params,
                 background=background,
@@ -300,16 +330,20 @@ class SLAM:
                 q_main2vis=q_main2vis,
                 q_vis2main=q_vis2main,
             )
+            
+            # Start GUI process for real-time visualization
             gui_process = mp.Process(target=slam_gui.run, args=(params_gui,))
             gui_process.start()
-            self.all_trigered += 1
+            self.all_trigered += 1  # Update trigger counter
 
-
+        # Wait for all core SLAM processes to complete
         for p in processes:
             p.join()
 
+        # Terminate the printer process used for logging
         self.printer.terminate()
 
+        # Clean up any remaining child processes
         for process in mp.active_children():
             process.terminate()
             process.join()

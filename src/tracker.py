@@ -10,7 +10,7 @@ class Tracker:
     def __init__(self, slam, pipe:Connection):
         self.cfg = slam.cfg
         self.device = self.cfg['device']
-        self.net = slam.droid_net
+        self.net = slam.droid_net # DroidNet
         self.video = slam.video
         self.verbose = slam.verbose
         self.pipe = pipe
@@ -29,63 +29,101 @@ class Tracker:
         self.printer:Printer = slam.printer
 
     def run(self, stream:BaseDataset):
-        '''
-        Trigger the tracking process.
-        1. check whether there is enough motion between the current frame and last keyframe by motion_filter
-        2. use frontend to do local bundle adjustment, to estimate camera pose and depth image, 
-            also delete the current keyframe if it is too close to the previous keyframe after local BA.
-        3. run online global BA periodically by backend
-        4. send the estimated pose and depth to mapper, 
-            and wait until the mapper finish its current mapping optimization.
-        '''
-        prev_kf_idx = 0
-        curr_kf_idx = 0
-        prev_ba_idx = 0
+        """
+        Main tracking loop that processes the input image stream.
+        
+        This function implements the core tracking pipeline:
+        1. Motion filtering: Check if there's enough motion to add a new keyframe
+        2. Frontend processing: Local bundle adjustment and keyframe selection
+        3. Backend optimization: Periodic global bundle adjustment
+        4. Inter-process communication: Send pose/depth estimates to mapper
+        
+        Args:
+            stream (BaseDataset): Input image stream containing timestamps and images
+        """
+        # Initialize tracking state variables
+        prev_kf_idx = 0      # Previous keyframe index
+        curr_kf_idx = 0      # Current keyframe index  
+        prev_ba_idx = 0      # Last keyframe where bundle adjustment was performed
 
+        # Get camera intrinsic parameters
         intrinsic = stream.get_intrinsic()
-        # for (timestamp, image, _, _) in tqdm(stream):
+        
+        # Process each frame in the input stream
         for i in range(len(stream)):
             timestamp, image, _, _ = stream[i]
+            
             with torch.no_grad():
+                # Store the keyframe count before processing this frame
                 starting_count = self.video.counter.value
-                ### check there is enough motion
+                
+                # Step 1: Motion filtering - determine if frame should be added as keyframe
+                # This checks if there's sufficient motion between current frame and last keyframe
+                # if to make kf, save features to video buffer
                 force_to_add_keyframe = self.motion_filter.track(timestamp, image, intrinsic)
 
-                # local bundle adjustment
+                # Step 2: Frontend processing - local bundle adjustment
+                # This estimates camera pose and depth, and may remove redundant keyframes
+                # see def __update(self, force_to_add_keyframe) in frontend.py
                 self.frontend(force_to_add_keyframe)
 
+                # Step 3: Handle full-resolution features if enabled and new keyframe was added
                 if (starting_count < self.video.counter.value) and self.cfg['mapping']['full_resolution']:
                     if self.motion_filter.uncertainty_aware:
+                        # Extract full-resolution image features for uncertainty estimation
                         img_full = stream.get_color_full_resol(i)
-                        self.motion_filter.get_img_feature(timestamp,img_full,suffix='full')
+                        self.motion_filter.get_img_feature(timestamp, img_full, suffix='full')
+            
+            # Update current keyframe index
             curr_kf_idx = self.video.counter.value - 1
             
+            # Step 4: Handle new keyframes and communicate with mapper
             if curr_kf_idx != prev_kf_idx and self.frontend.is_initialized:
                 if self.video.counter.value == self.frontend.warmup:
-                    ## We just finish the initialization
-                    self.pipe.send({"is_keyframe":True, "video_idx":curr_kf_idx,
-                                    "timestamp":timestamp, "just_initialized": True, 
-                                    "end":False})
-                    self.pipe.recv()
-                    self.frontend.initialize_second_stage()
+                    # Special case: SLAM system initialization just completed
+                    self.pipe.send({
+                        "is_keyframe": True, 
+                        "video_idx": curr_kf_idx,
+                        "timestamp": timestamp,
+                        "just_initialized": True, 
+                        "end": False
+                    })
+                    self.pipe.recv()  # Wait for mapper acknowledgment
+                    self.frontend.initialize_second_stage()  # Start second stage initialization
                 else:
+                    # Regular keyframe processing
                     if self.enable_online_ba and curr_kf_idx >= prev_ba_idx + self.ba_freq:
-                        # run online global BA every {self.ba_freq} keyframes
-                        self.printer.print(f"Online BA at {curr_kf_idx}th keyframe, frame index: {timestamp}",FontColor.TRACKER)
+                        # Step 5: Periodic global bundle adjustment
+                        # Run global BA every ba_freq keyframes to maintain global consistency
+                        self.printer.print(f"Online BA at {curr_kf_idx}th keyframe, frame index: {timestamp}", FontColor.TRACKER)
                         self.online_ba.dense_ba(2)
                         prev_ba_idx = curr_kf_idx
-                    # inform the mapper that the estimation of current pose and depth is finished
-                    self.pipe.send({"is_keyframe":True, "video_idx":curr_kf_idx,
-                                    "timestamp":timestamp, "just_initialized": False, 
-                                    "end":False})
-                    self.pipe.recv()
+                    
+                    # Step 6: Send pose and depth estimates to mapper process
+                    # This triggers the mapping process to update the 3D map
+                    self.pipe.send({
+                        "is_keyframe": True,
+                        "video_idx": curr_kf_idx,
+                        "timestamp": timestamp,
+                        "just_initialized": False, 
+                        "end": False
+                    })
+                    self.pipe.recv()  # Wait for mapper to finish processing
 
+            # Update state for next iteration
             prev_kf_idx = curr_kf_idx
-            self.printer.update_pbar()
+            self.printer.update_pbar()  # Update progress bar
 
-        self.pipe.send({"is_keyframe":True, "video_idx":None,
-                        "timestamp":None, "just_initialized": False, 
-                        "end":True})
+        # Step 7: Signal end of tracking to mapper process
+        self.pipe.send({
+            "is_keyframe": True, 
+            "video_idx": None,
+            "timestamp": None, 
+            "just_initialized": False, 
+            "pose": None,
+            "depth": None,
+            "end": True
+        })
 
 
                 

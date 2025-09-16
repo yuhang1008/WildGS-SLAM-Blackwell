@@ -85,7 +85,7 @@ class BasicEncoder(nn.Module):
             self.norm1 = nn.BatchNorm2d(DIM)
 
         elif norm_fn == 'instance':
-            self.norm1 = nn.InstanceNorm2d(DIM)
+            self.norm1 = nn.InstanceNorm2d(DIM) # normal
 
         elif self.norm_fn == 'none':
             self.norm1 = nn.Sequential()
@@ -93,7 +93,7 @@ class BasicEncoder(nn.Module):
         else:
             raise TypeError(self.norm_fn)
 
-        self.conv1 = nn.Conv2d(3, DIM, 7, 2, 3)
+        self.conv1 = nn.Conv2d(3, DIM, 7, 2, 3) # 3: input channels, DIM: output channels, 7: kernel size, 2: stride, 3: padding
         self.relu1 = nn.ReLU(inplace=True)
 
         self.in_planes = DIM
@@ -125,17 +125,17 @@ class BasicEncoder(nn.Module):
         b, n, c1, h1, w1 = x.shape
         x = x.view(b*n, c1, h1, w1)
 
-        x = self.conv1(x)
+        x = self.conv1(x) # b*n , DIM , h1 , w1 -> b*n , DIM , h1/2 , w1/2
         x = self.norm1(x)
         x = self.relu1(x)
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
+        x = self.layer1(x) # b*n , DIM , h1/2 , w1/2 -> b*n , DIM , h1/2 , w1/2
+        x = self.layer2(x) # b*n , DIM , h1/2 , w1/2 -> b*n , 2*DIM , h1/4 , w1/4
+        x = self.layer3(x) # b*n , 2*DIM , h1/4 , w1/4 -> b*n , 4*DIM , h1/8 , w1/8
 
-        x = self.conv2(x)
+        x = self.conv2(x) # b*n , 4*DIM , h1/8 , w1/8 -> b*n , out_dim , h1/8 , w1/8
 
         _, c2, h2, w2 = x.shape
-        x = x.view(b, n, c2, h2, w2)
+        x = x.view(b, n, c2, h2, w2) # b, n, out_dim, h1/8, w1/8
 
         return x

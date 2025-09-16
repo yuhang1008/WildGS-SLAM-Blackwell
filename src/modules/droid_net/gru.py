@@ -32,10 +32,15 @@ class ConvGRU(nn.Module):
         self.convq_glo = nn.Conv2d(h_planes, h_planes, kernel_size=(1, 1), padding=(0, 0))
 
     def forward(self, net, *inputs):
-        inp = torch.cat(inputs, dim=1)
-        net_inp = torch.cat([net, inp], dim=1)
+        # net: first128_cnet_feature[b*n, 128, 45, 80]
+        # inputs:
+        # second128_cnet_feature[b*n, 128, 45, 80]
+        # corr[b*n, 128, 45, 80]
+        # flow[b*n, 64, 45, 80]
+        inp = torch.cat(inputs, dim=1) # [b*n, 128+128+64 (320), 45, 80]
+        net_inp = torch.cat([net, inp], dim=1) # [b*n, 128+320 (448), 45, 80]
 
-        b, c, h, w = net.shape
+        b, c, h, w = net.shape # 
         glo = torch.sigmoid(self.w(net)) * net
         glo = glo.view(b, c, h*w).mean(dim=-1, keepdim=True).view(b, c, 1, 1)
 

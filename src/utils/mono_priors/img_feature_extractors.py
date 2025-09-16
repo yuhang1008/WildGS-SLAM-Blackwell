@@ -93,7 +93,7 @@ def predict_img_features(
     suffix: str = "",
 ) -> torch.Tensor:
     """
-    Predict image features using the given model.
+    Predict image uncertainty using the given model.
 
     Args:
         model (nn.Module): The feature extractor model.

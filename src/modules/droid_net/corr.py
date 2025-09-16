@@ -37,33 +37,98 @@ class CorrSampler(torch.autograd.Function):
 
 
 class CorrBlock:
+    """
+    Multi-scale correlation block for visual correspondence matching.
+    
+    This class builds a correlation pyramid between two feature maps and provides
+    efficient sampling of correlation features at different scales. It's used for
+    estimating visual correspondences between consecutive frames in SLAM.
+    
+    The correlation pyramid enables coarse-to-fine matching:
+    - Level 0: Full resolution correlation
+    - Level 1: 1/2 resolution correlation  
+    - Level 2: 1/4 resolution correlation
+    - Level 3: 1/8 resolution correlation
+    """
+    
     def __init__(self, fmap1, fmap2, num_levels=4, radius=3):
-        self.num_levels = num_levels
-        self.radius = radius
-        self.corr_pyramid = []
+        """
+        Initialize correlation block with two feature maps.
+        
+        Args:
+            fmap1: previous frame feature map shape [b, n, 128, 45, 80]
+            fmap2: current frame feature map shape [b, n, 128, 45, 80]
+            num_levels: Number of pyramid levels (default: 4)
+            radius: Sampling radius for correlation features (default: 3)
+        """
+        self.num_levels = num_levels  # Number of pyramid levels
+        self.radius = radius          # Sampling radius (3x3 neighborhood)
 
-        # all pairs correlation
-        corr = CorrBlock.corr(fmap1, fmap2)
+        #[
+        # [b*n, 45, 80, 45, 80]
+        # [b*n, 45, 80, 22, 40]
+        # [b*n, 45, 80, 11, 20]
+        # [b*n, 45, 80, 5, 10]
+        #]
+        self.corr_pyramid = []        # Store correlation pyramid
 
-        batch, num, h1, w1, h2, w2 = corr.shape
-        corr = corr.reshape(batch*num*h1*w1, 1, h2, w2)
+        # Step 1: Compute all-pairs correlation between feature maps
+        corr = CorrBlock.corr(fmap1, fmap2) # [b, n, 45, 80, 45, 80]
 
+        # Extract dimensions from correlation volume
+        batch, num, h1, w1, h2, w2 = corr.shape # [b, n, 45, 80, 45, 80]
+        corr = corr.reshape(batch*num*h1*w1, 1, h2, w2) # [b*n*45*80, 1, 45, 80]
+
+        # Step 2: Build multi-scale correlation pyramid
         for i in range(self.num_levels):
+            # Store current level of correlation pyramid
+            # Shape: [b*n, h1, w1, h2//2**i, w2//2**i]
             self.corr_pyramid.append(
                 corr.view(batch*num, h1, w1, h2//2**i, w2//2**i)
             )
+            # Downsample for next level, [b*n*h1*w1, 1, h, w] -> [b*n*h1*w1, 1, h//2, w//2]
             corr = F.avg_pool2d(corr, kernel_size=2, stride=2)
 
     def __call__(self, coords):
+        """
+        Sample correlation features at specified coordinates.
+        
+        This method samples correlation features from the multi-scale pyramid
+        at the given pixel coordinates. For each coordinate, it samples a
+        radius x radius neighborhood from each pyramid level.
+        
+        Args:
+            coords: Coordinate tensor shape [batch, num, ht, wd, 2]
+                   where each pixel has (x, y) coordinates
+                   
+        Returns:
+            torch.Tensor: Correlation features shape [batch, num, 4*radius^2, ht, wd]
+                         where 4*radius^2 = 4*(2*3+1)^2 = 196 features per pixel
+                         (49 features from each of 4 pyramid levels)
+        """
         out_pyramid = []
-        batch, num, ht, wd, _ = coords.shape
-        coords = coords.permute(0, 1, 4, 2, 3)
-        coords = coords.contiguous().view(batch*num, 2, ht, wd)
+        batch, num, ht, wd, _ = coords.shape # [b, n, 45, 80, 2]
+        
 
+        coords = coords.permute(0, 1, 4, 2, 3) # [b, n, 2, 45, 80]
+        coords = coords.contiguous().view(batch*num, 2, ht, wd) # [b*n, 2, 45, 80]
+
+        # Sample correlation features from each pyramid level
+        # corr_pyramid:
+        #[
+        # [b*n, 45, 80, 45, 80]
+        # [b*n, 45, 80, 22, 40]
+        # [b*n, 45, 80, 11, 20]
+        # [b*n, 45, 80, 5, 10]
+        #]
         for i in range(self.num_levels):
             corr = CorrSampler.apply(self.corr_pyramid[i], coords/2**i, self.radius)
-            out_pyramid.append(corr.view(batch, num, -1, ht, wd))
+            print(corr.shape)
+            
+            out_pyramid.append(corr.view(batch, num, -1, ht, wd)) # [b, n, 7*7, 45, 80] from each level
 
+        # Concatenate features from all pyramid levels
+        # Final shape: [batch, num, 4*radius^2, ht, wd] = [batch, num, 196, ht, wd]
         return torch.cat(out_pyramid, dim=2)
 
     def cat(self, other):
@@ -80,13 +145,36 @@ class CorrBlock:
 
     @staticmethod
     def corr(fmap1, fmap2):
-        """ all-pairs correlation """
+        """
+        Compute all-pairs correlation between two feature maps.
+        
+        This method computes the dot product (correlation) between every pixel
+        in fmap1 and every pixel in fmap2. The result is a 4D correlation volume
+        that indicates how well each pixel in fmap1 matches each pixel in fmap2.
+        
+        Args:
+            fmap1: First feature map shape [batch, num, 128, ht, wd] - previous frame
+            fmap2: Second feature map shape [batch, num, 128, ht, wd] - current frame
+            
+        Returns:
+            torch.Tensor: Correlation volume shape [batch, num, ht, wd, ht, wd]
+                         where corr[b,n,i,j,k,l] = similarity between pixel (i,j) in fmap1
+                         and pixel (k,l) in fmap2
+        """
+        # Extract dimensions from feature maps
+        # [1, 1, 128, 45 (h/8), 80 (w/8)]
         batch, num, dim, ht, wd = fmap1.shape
+        
+        # Reshape to [1, 128, 45*80], and normalize by 4.0
         fmap1 = fmap1.reshape(batch*num, dim, ht*wd) / 4.0
         fmap2 = fmap2.reshape(batch*num, dim, ht*wd) / 4.0
 
-        corr = torch.matmul(fmap1.transpose(1, 2), fmap2)
+        # Compute all-pairs correlation using matrix multiplication
+        # fmap1.transpose(1, 2): [1, 45*80, 128]
+        # fmap2: [1, 128, 45*80]
+        corr = torch.matmul(fmap1.transpose(1, 2), fmap2) # [1, 45*80, 45*80]
 
+        # Reshape to correlation volume: [1, 1, 45, 80, 45, 80]
         return corr.view(batch, num, ht, wd, ht, wd)
 
 

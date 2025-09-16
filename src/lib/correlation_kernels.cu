@@ -29,39 +29,44 @@ __forceinline__ __device__ bool within_bounds(int h, int w, int H, int W) {
 
 template <typename scalar_t>
 __global__ void corr_index_forward_kernel(
+    // [b*n, 45, 80, 45/2^i, 80/2^i]
     const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> volume,
+    // [b*n, 2, 45, 80]
     const torch::PackedTensorAccessor32<float,4,torch::RestrictPtrTraits> coords,
+    // [batch_size, 2*radius+1, 2*radius+1, ht, wd]
     torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> corr,
-    int r)
+    int r) // radius = 3 by default
 {
   // batch index
-  const int x = blockIdx.x * blockDim.x + threadIdx.x;
-  const int y = blockIdx.y * blockDim.y + threadIdx.y;
-  const int n = blockIdx.z;
+  const int x = blockIdx.x * blockDim.x + threadIdx.x; // last frame w index
+  const int y = blockIdx.y * blockDim.y + threadIdx.y; // last frame h index
+  const int n = blockIdx.z; // batch
 
-  const int h1 = volume.size(1);
-  const int w1 = volume.size(2);
-  const int h2 = volume.size(3);
-  const int w2 = volume.size(4);
+  const int h1 = volume.size(1); // last frame width 45
+  const int w1 = volume.size(2); // last frame height 80
+  const int h2 = volume.size(3); // cur frame width 45/2^i
+  const int w2 = volume.size(4); // cur frame height 80/2^i
 
   if (!within_bounds(y, x, h1, w1)) {
     return;
   }
 
-  float x0 = coords[n][0][y][x];
-  float y0 = coords[n][1][y][x];
+  float x0 = coords[n][0][y][x]; // cur frame w index in volume
+  float y0 = coords[n][1][y][x]; // cur frame h index in volume
 
   float dx = x0 - floor(x0);
   float dy = y0 - floor(y0);
 
-  int rd = 2*r + 1;
+  // the following will generate a 7*7 grid of feature
+  int rd = 2*r + 1; // 7x7 grid
   for (int i=0; i<rd+1; i++) {
     for (int j=0; j<rd+1; j++) {
+      // indices of neighbor pixels in volume
       int x1 = static_cast<int>(floor(x0)) - r + i;
       int y1 = static_cast<int>(floor(y0)) - r + j;
 
       if (within_bounds(y1, x1, h2, w2)) {
-        scalar_t s = volume[n][y][x][y1][x1];
+        scalar_t s = volume[n][y][x][y1][x1]; // feature of neighbor pixel, from volume
 
         if (i > 0 && j > 0)
           corr[n][i-1][j-1][y][x] += s * scalar_t(dx * dy);
@@ -135,13 +140,13 @@ __global__ void corr_index_backward_kernel(
 }
 
 std::vector<torch::Tensor> corr_index_cuda_forward(
-    torch::Tensor volume,
-    torch::Tensor coords,
+    torch::Tensor volume, // [b*n, 45, 80, 45/2^i, 80/2^i]
+    torch::Tensor coords, // [b*n, 2, 45, 80]
     int radius)
 {
-  const auto batch_size = volume.size(0);
-  const auto ht = volume.size(1);
-  const auto wd = volume.size(2);
+  const auto batch_size = volume.size(0); // actually b*n
+  const auto ht = volume.size(1); // last frame 45
+  const auto wd = volume.size(2); // last frame 80
 
   const dim3 blocks((wd + BLOCK - 1) / BLOCK, 
                     (ht + BLOCK - 1) / BLOCK, 
